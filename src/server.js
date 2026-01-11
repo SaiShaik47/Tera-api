@@ -6,6 +6,42 @@ const app = express();
 app.use(express.json({ limit: "1mb" }));
 
 app.get("/health", (req, res) => res.json({ ok: true }));
+app.get("/", (req, res) => {
+  res.json({
+    ok: true,
+    message: "TeraBox folder streaming API",
+    endpoints: {
+      health: "GET /health",
+      folder: "POST /folder { url }",
+      resolve: "POST /resolve { url, pick }",
+      stream: "GET /stream?url=..."
+    }
+  });
+});
+
+const TERABOX_COOKIE = process.env.TERABOX_COOKIE || "";
+
+/**
+ * POST /folder
+ * body: { url: "<terabox folder link>" }
+ * returns: files[] = [{ name, size, id }]
+ */
+app.post("/folder", async (req, res) => {
+  const { url } = req.body || {};
+  if (!url) {
+    res.status(400).json({ ok: false, error: "MISSING_URL" });
+    return;
+  }
+  if (!TERABOX_COOKIE) {
+    res.status(500).json({ ok: false, error: "MISSING_SERVER_COOKIE" });
+    return;
+  }
+
+  try {
+    const files = await listFolderFiles(url, TERABOX_COOKIE);
+
+    if (!files.length) {
+      res.json({
 
 
     if (!files.length) {
@@ -15,6 +51,7 @@ app.get("/health", (req, res) => res.json({ ok: true }));
         message:
           "I opened the folder, but couldn’t read the file list. TeraBox layout/API may be different for your link."
       });
+      return;
     }
 
     res.json({ ok: true, count: files.length, files });
@@ -29,6 +66,7 @@ app.get("/health", (req, res) => res.json({ ok: true }));
 
 /**
  * POST /resolve
+ * body: { url: "<terabox folder link>", pick: 0 }
 
  * pick = which file number from /folder list (0 = first)
  *
@@ -36,6 +74,13 @@ app.get("/health", (req, res) => res.json({ ok: true }));
  */
 app.post("/resolve", async (req, res) => {
   const { url, pick } = req.body || {};
+  if (!url) {
+    res.status(400).json({ ok: false, error: "MISSING_URL" });
+    return;
+  }
+  if (!TERABOX_COOKIE) {
+    res.status(500).json({ ok: false, error: "MISSING_SERVER_COOKIE" });
+    return;
   if (!url) return res.status(400).json({ ok: false, error: "MISSING_URL" });
   if (!TERABOX_COOKIE) {
     return res.status(500).json({ ok: false, error: "MISSING_SERVER_COOKIE" });
@@ -46,6 +91,11 @@ app.post("/resolve", async (req, res) => {
   try {
     const files = await listFolderFiles(url, TERABOX_COOKIE);
     if (!files.length) {
+      res.json({ ok: false, error: "NO_FILES_FOUND", message: "Folder list empty." });
+      return;
+    }
+    if (index < 0 || index >= files.length) {
+      res.json({
       return res.json({ ok: false, error: "NO_FILES_FOUND", message: "Folder list empty." });
     }
     if (index < 0 || index >= files.length) {
@@ -54,6 +104,7 @@ app.post("/resolve", async (req, res) => {
         error: "BAD_PICK",
         message: `pick must be between 0 and ${files.length - 1}`
       });
+      return;
     }
 
     // IMPORTANT:
@@ -62,12 +113,14 @@ app.post("/resolve", async (req, res) => {
     const directUrl = files[index].directUrl || null;
 
     if (!directUrl) {
+      res.json({
       return res.json({
         ok: false,
         error: "NO_DIRECT_URL",
         message:
           "I found the file, but didn’t get a direct download URL from TeraBox yet. I can adapt the resolver if you share the exact share-link format (without cookies)."
       });
+      return;
     }
 
     const meta = await getMetadata(directUrl, TERABOX_COOKIE);
@@ -75,6 +128,7 @@ app.post("/resolve", async (req, res) => {
       directUrl
     )}`;
 
+    res.json({
     return res.json({
       ok: true,
       name: meta.name,
@@ -97,6 +151,13 @@ app.post("/resolve", async (req, res) => {
 app.get("/stream", async (req, res) => {
   const directUrl = req.query.url?.toString();
 
+  if (!directUrl) {
+    res.status(400).json({ ok: false, error: "MISSING_URL" });
+    return;
+  }
+  if (!TERABOX_COOKIE) {
+    res.status(500).json({ ok: false, error: "MISSING_SERVER_COOKIE" });
+    return;
   if (!directUrl) return res.status(400).json({ ok: false, error: "MISSING_URL" });
   if (!TERABOX_COOKIE) {
     return res.status(500).json({ ok: false, error: "MISSING_SERVER_COOKIE" });
@@ -109,11 +170,13 @@ app.get("/stream", async (req, res) => {
   });
 
   if (!upstream.ok) {
+    res.status(upstream.status).json({
     return res.status(upstream.status).json({
       ok: false,
       error: "UPSTREAM_ERROR",
       message: `Upstream returned ${upstream.status}`
     });
+    return;
   }
 
   const ct = upstream.headers.get("content-type") || "application/octet-stream";
