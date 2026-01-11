@@ -6,35 +6,7 @@ const app = express();
 app.use(express.json({ limit: "1mb" }));
 
 app.get("/health", (req, res) => res.json({ ok: true }));
-app.get("/", (req, res) => {
-  res.json({
-    ok: true,
-    message: "TeraBox folder streaming API",
-    endpoints: {
-      health: "GET /health",
-      folder: "POST /folder { url }",
-      resolve: "POST /resolve { url, pick }",
-      stream: "GET /stream?url=..."
-    }
-  });
-});
 
-const TERABOX_COOKIE = process.env.TERABOX_COOKIE || "";
-
-/**
- * POST /folder
- * body: { url: "<terabox folder link>" }
- * returns: files[] = [{ name, size, id }]
- */
-app.post("/folder", async (req, res) => {
-  const { url } = req.body || {};
-  if (!url) return res.status(400).json({ ok: false, error: "MISSING_URL" });
-  if (!TERABOX_COOKIE) {
-    return res.status(500).json({ ok: false, error: "MISSING_SERVER_COOKIE" });
-  }
-
-  try {
-    const files = await listFolderFiles(url, TERABOX_COOKIE);
 
     if (!files.length) {
       return res.json({
@@ -57,7 +29,7 @@ app.post("/folder", async (req, res) => {
 
 /**
  * POST /resolve
- * body: { url: "<terabox folder link>", pick: 0 }
+
  * pick = which file number from /folder list (0 = first)
  *
  * returns: metadata attaching downloadUrl (stream link)
