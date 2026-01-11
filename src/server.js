@@ -6,18 +6,6 @@ const app = express();
 app.use(express.json({ limit: "1mb" }));
 
 app.get("/health", (req, res) => res.json({ ok: true }));
-app.get("/", (req, res) => {
-  res.json({
-    ok: true,
-    message: "TeraBox folder streaming API",
-    endpoints: {
-      health: "GET /health",
-      folder: "POST /folder { url, cookie }",
-      resolve: "POST /resolve { url, cookie, pick }",
-      stream: "GET /stream?url=... (header: x-cookie)"
-    }
-  });
-});
 
 /**
  * POST /folder
