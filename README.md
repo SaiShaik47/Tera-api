@@ -36,11 +36,13 @@ curl -X POST https://YOUR-DEPLOY-URL/folder \
 curl -X POST https://YOUR-DEPLOY-URL/resolve \
   -H "Content-Type: application/json" \
   -d '{"url":"PASTE_FOLDER_LINK","pick":0}'
+
 ```
 
 ### 3) Stream the file
 
 ```bash
 curl -L "PASTE_downloadUrl_FROM_RESOLVE" \
+
   -o file.bin
 ```

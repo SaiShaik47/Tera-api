@@ -42,6 +42,10 @@ app.post("/folder", async (req, res) => {
 
     if (!files.length) {
       res.json({
+
+
+    if (!files.length) {
+      return res.json({
         ok: false,
         error: "NO_FILES_FOUND",
         message:
@@ -63,6 +67,7 @@ app.post("/folder", async (req, res) => {
 /**
  * POST /resolve
  * body: { url: "<terabox folder link>", pick: 0 }
+
  * pick = which file number from /folder list (0 = first)
  *
  * returns: metadata attaching downloadUrl (stream link)
@@ -76,6 +81,9 @@ app.post("/resolve", async (req, res) => {
   if (!TERABOX_COOKIE) {
     res.status(500).json({ ok: false, error: "MISSING_SERVER_COOKIE" });
     return;
+  if (!url) return res.status(400).json({ ok: false, error: "MISSING_URL" });
+  if (!TERABOX_COOKIE) {
+    return res.status(500).json({ ok: false, error: "MISSING_SERVER_COOKIE" });
   }
 
   const index = Number.isInteger(pick) ? pick : 0;
@@ -88,6 +96,10 @@ app.post("/resolve", async (req, res) => {
     }
     if (index < 0 || index >= files.length) {
       res.json({
+      return res.json({ ok: false, error: "NO_FILES_FOUND", message: "Folder list empty." });
+    }
+    if (index < 0 || index >= files.length) {
+      return res.json({
         ok: false,
         error: "BAD_PICK",
         message: `pick must be between 0 and ${files.length - 1}`
@@ -102,6 +114,7 @@ app.post("/resolve", async (req, res) => {
 
     if (!directUrl) {
       res.json({
+      return res.json({
         ok: false,
         error: "NO_DIRECT_URL",
         message:
@@ -116,6 +129,7 @@ app.post("/resolve", async (req, res) => {
     )}`;
 
     res.json({
+    return res.json({
       ok: true,
       name: meta.name,
       size: meta.size,
@@ -144,6 +158,9 @@ app.get("/stream", async (req, res) => {
   if (!TERABOX_COOKIE) {
     res.status(500).json({ ok: false, error: "MISSING_SERVER_COOKIE" });
     return;
+  if (!directUrl) return res.status(400).json({ ok: false, error: "MISSING_URL" });
+  if (!TERABOX_COOKIE) {
+    return res.status(500).json({ ok: false, error: "MISSING_SERVER_COOKIE" });
   }
 
   const upstream = await fetch(directUrl, {
@@ -154,6 +171,7 @@ app.get("/stream", async (req, res) => {
 
   if (!upstream.ok) {
     res.status(upstream.status).json({
+    return res.status(upstream.status).json({
       ok: false,
       error: "UPSTREAM_ERROR",
       message: `Upstream returned ${upstream.status}`
