@@ -7,18 +7,6 @@ app.use(express.json({ limit: "1mb" }));
 
 app.get("/health", (req, res) => res.json({ ok: true }));
 
-/**
- * POST /folder
- * body: { url: "<terabox folder link>", cookie: "<document.cookie>" }
- * returns: files[] = [{ name, size, id }]
- */
-app.post("/folder", async (req, res) => {
-  const { url, cookie } = req.body || {};
-  if (!url) return res.status(400).json({ ok: false, error: "MISSING_URL" });
-  if (!cookie) return res.status(400).json({ ok: false, error: "MISSING_COOKIE" });
-
-  try {
-    const files = await listFolderFiles(url, cookie);
 
     if (!files.length) {
       return res.json({
@@ -41,20 +29,22 @@ app.post("/folder", async (req, res) => {
 
 /**
  * POST /resolve
- * body: { url: "<terabox folder link>", cookie: "<document.cookie>", pick: 0 }
+
  * pick = which file number from /folder list (0 = first)
  *
  * returns: metadata attaching downloadUrl (stream link)
  */
 app.post("/resolve", async (req, res) => {
-  const { url, cookie, pick } = req.body || {};
+  const { url, pick } = req.body || {};
   if (!url) return res.status(400).json({ ok: false, error: "MISSING_URL" });
-  if (!cookie) return res.status(400).json({ ok: false, error: "MISSING_COOKIE" });
+  if (!TERABOX_COOKIE) {
+    return res.status(500).json({ ok: false, error: "MISSING_SERVER_COOKIE" });
+  }
 
   const index = Number.isInteger(pick) ? pick : 0;
 
   try {
-    const files = await listFolderFiles(url, cookie);
+    const files = await listFolderFiles(url, TERABOX_COOKIE);
     if (!files.length) {
       return res.json({ ok: false, error: "NO_FILES_FOUND", message: "Folder list empty." });
     }
@@ -80,7 +70,7 @@ app.post("/resolve", async (req, res) => {
       });
     }
 
-    const meta = await getMetadata(directUrl, cookie);
+    const meta = await getMetadata(directUrl, TERABOX_COOKIE);
     const streamUrl = `${req.protocol}://${req.get("host")}/stream?url=${encodeURIComponent(
       directUrl
     )}`;
@@ -103,18 +93,18 @@ app.post("/resolve", async (req, res) => {
 
 /**
  * GET /stream?url=<directUrl>
- * header: x-cookie: <cookie>
  */
 app.get("/stream", async (req, res) => {
   const directUrl = req.query.url?.toString();
-  const cookie = req.headers["x-cookie"]?.toString();
 
   if (!directUrl) return res.status(400).json({ ok: false, error: "MISSING_URL" });
-  if (!cookie) return res.status(400).json({ ok: false, error: "MISSING_COOKIE_HEADER" });
+  if (!TERABOX_COOKIE) {
+    return res.status(500).json({ ok: false, error: "MISSING_SERVER_COOKIE" });
+  }
 
   const upstream = await fetch(directUrl, {
     method: "GET",
-    headers: { cookie },
+    headers: { cookie: TERABOX_COOKIE },
     redirect: "follow"
   });
 
